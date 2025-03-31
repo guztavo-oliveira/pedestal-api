@@ -2,6 +2,7 @@
   (:require [io.pedestal.http.route :as route]
             [io.pedestal.http :as http]
             [io.pedestal.test :as test]
+            [io.pedestal.interceptor :as i]
             [pedestal-api.database :as database]))
 
 (defonce server (atom nil))
@@ -42,18 +43,23 @@
                  :get ;;method
                  hello-fn ;;function that return from request
                  :route-name :hello-world] ;;every route must have a unique name
-                ["/task" :post [db-interceptor create-task] :route-name :create-task]
-                ["/tasks" :get [db-interceptor get-tasks] :route-name :get-tasks]
-                ["/task/:id" :delete [db-interceptor delete-task] :route-name :delete-task]
-                ["/task/:id" :patch [db-interceptor update-task] :route-name :update-task]}))
+                ["/task" :post create-task :route-name :create-task]
+                ["/tasks" :get get-tasks :route-name :get-tasks]
+                ["/task/:id" :delete delete-task :route-name :delete-task]
+                ["/task/:id" :patch update-task :route-name :update-task]}))
 
 (def service-map {::http/routes routes
                   ::http/port 9999
                   ::http/type :jetty ;;define the server, can be another
                   ::http/join? false}) ;;prevent to block Clojure thread (?)
 
+(def service-map-with-interceptor
+  (-> service-map
+      (http/default-interceptors);;need this to satisfy logic underneath
+      (update ::http/interceptors conj (i/interceptor db-interceptor)))) ;;add custom interceptor
+
 (defn start-server []
-  (reset! server (http/start(http/create-server service-map))))
+  (reset! server (http/start(http/create-server service-map-with-interceptor))))
 
 (defn stop-server []
   (http/stop @server))
