@@ -4,10 +4,10 @@
             [io.pedestal.test :as test]
             [pedestal-api.database :as database]))
 
-(def server (atom nil))
+(defonce server (atom nil))
 
 (defn hello-fn [request]
-  {:status 200 :body (str "Hello World " (get-in request [:query-params :name] "stranger"))})
+  {:status 200 :body (str "Hello World! " (get-in request [:query-params :name] "stranger"))})
 
 (defn create-task [req]
   (let [uuid (java.util.UUID/randomUUID)
@@ -20,6 +20,15 @@
 
 (defn get-tasks [req]
   {:status 200 :body @(:store req)})
+
+(defn delete-task [req]
+  (let [store (:store req)
+        task-id (-> (-> req :path-params :id)
+                    (java.util.UUID/fromString))]
+    (swap! store dissoc task-id)
+    {:status 200 :body "Task removed"}))
+
+(defn update-task [req])
 
 (defn assoc-store [context]
   (update context :request assoc :store database/store))
@@ -34,7 +43,9 @@
                  hello-fn ;;function that return from request
                  :route-name :hello-world] ;;every route must have a unique name
                 ["/task" :post [db-interceptor create-task] :route-name :create-task]
-                ["/tasks" :get [db-interceptor get-tasks] :route-name :get-tasks]}))
+                ["/tasks" :get [db-interceptor get-tasks] :route-name :get-tasks]
+                ["/task/:id" :delete [db-interceptor delete-task] :route-name :delete-task]
+                ["/task/:id" :patch [db-interceptor update-task] :route-name :update-task]}))
 
 (def service-map {::http/routes routes
                   ::http/port 9999
@@ -57,9 +68,10 @@
   (test/response-for (::http/service-fn @server) verb url))
 
 (start-server)
-(clojure.pprint/pprint (test-request :get "/hello?name=Gustavo"))
-(clojure.pprint/pprint (test-request :post "/task?task=teste&status=pending"))
-(clojure.pprint/pprint (test-request :post "/task?task=Ler&status=pending"))
-(clojure.pprint/pprint (test-request :post "/task?task=Correr&status=pending"))
+(comment (test-request :get "/hello?name=Gustavo"))
+(comment (test-request :post "/task?task=teste&status=pending"))
+(comment (test-request :post "/task?task=Ler&status=pending"))
+(comment (test-request :post "/task?task=Correr&status=pending"))
 
-(clojure.pprint/pprint (test-request :get "/tasks"))
+(comment (test-request :get "/tasks"))
+(comment (test-request :delete "/task/dfccca43-9103-4fee-92c4-50d28228b448"))
